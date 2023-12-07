@@ -4,6 +4,7 @@ import (
 	"gofiber/database"
 	"gofiber/model/entity"
 	"gofiber/model/request"
+	"gofiber/utils"
 	"log"
 
 	"github.com/go-playground/validator/v10"
@@ -11,6 +12,11 @@ import (
 )
 
 func UserHanlerGetAll(ctx *fiber.Ctx) error {
+	userInfo := ctx.Locals("userInfo")
+
+	log.Println("user info :: ", userInfo)
+
+
 	var users []entity.User
 
 	err := database.DB.Find(&users).Error
@@ -46,6 +52,17 @@ func UserHandlerCreate(ctx *fiber.Ctx) error {
 		Adress: user.Adress,
 		Phone: user.Phone,
 	}
+
+	hash, err := utils.HashPassword(user.Password)
+
+	if err != nil {
+		log.Println(err)
+		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message" : "internal server error",
+		})
+	}
+
+	newUser.Password = hash
 
 	errCreateUser := database.DB.Create(&newUser).Error;
 
@@ -124,4 +141,32 @@ func UserHandlerUpdate(ctx *fiber.Ctx) error {
 		"data" : user,
 	})
 
+}
+
+func UserHandlerDelete(ctx *fiber.Ctx) error{
+	userId := ctx.Params("id");
+	var user entity.User
+
+	err := database.DB.Debug().First(&user, "id = ?", userId).Error
+
+	if err != nil {
+		return ctx.Status(404).JSON(fiber.Map{
+			"status" : false,
+			"message" : "User not found",
+		})
+	}
+
+	errDelete := database.DB.Debug().Delete(&user).Error
+
+	if errDelete != nil {
+		return ctx.Status(500).JSON(fiber.Map{
+			"status" : false,
+			"message" : "Internal server error",
+		})
+	}
+
+	return ctx.Status(200).JSON(fiber.Map{
+		"status": true,
+		"message" : "User" + user.Name + "deleted",
+	})
 }
